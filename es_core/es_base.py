@@ -91,7 +91,8 @@ class Es(Integration):
                             "http_compress": None, "ssl_show_warn": False, "sniff_on_start": False, "sniff_on_connection_fail": False,
                             "sniffer_timeout": None
                           }
-            if inst['options']['no_auth'] == 1:
+
+            if 'no_auth' in inst['options'] and inst['options']['no_auth'] == 1:
                 myauth = False
             else:
                 myauth = True
