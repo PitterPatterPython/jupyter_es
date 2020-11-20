@@ -187,13 +187,13 @@ class Es(Integration):
         self.instances[instance]['last_query'] = query
         if qlang == "dsl":
             try:
-                dictquery = eval(myquery)
+                dictquery = json.loads(myquery)
                 if not isinstance(dictquery, dict):
                     print("The query provided for dsl is not a dictionary, therefore will not be processed as a dsl query")
                     print("Query:\n%s" % myquery)
                     bRun = False
             except:
-               print("The query provided for dsl is not a dictionary, therefore will not be processed as a dsl query")
+               print("The query provided for dsl is not a dictionary or had a conversion error, therefore will not be processed as a dsl query")
                print("Query:\n%s" % myquery)
                bRun = False
 
@@ -295,8 +295,6 @@ class Es(Integration):
     def customQuery(self, query, instance, reconnect=True):
 
         qlang, qindex, qpost, myquery = self.es_parse(query)
-
-
         mydf = None
         status = ""
         str_err = ""
@@ -305,24 +303,27 @@ class Es(Integration):
         batch_size = int(self.opts['es_batch_size'][0])
         scroll_time = self.opts['es_scroll_time'][0]
         if qlang in ['basic', 'dsl']:
+            bGood = True
             try:
                 if qlang == 'basic':
                     myres = self.instances[instance]['session'].search(q=myquery, index=qindex,  size=batch_size, scroll=scroll_time)
                 elif qlang == 'dsl':
-                    myres = self.instances[instance]['session'].search(body=myquery, index=qindex,  size=batch_size, scroll=scroll_time)
+                    mbody = json.loads(myquery)
+                    myres = self.instances[instance]['session'].search(body=mbody, index=qindex,  size=batch_size, scroll=scroll_time)
             except Exception as e:
+                bGood = False
                 mydf = None
                 str_err +="\nES Query error: %s" % str(e)
-
-            myscrollid = myres['_scroll_id']
-            all_hits = myres['hits']['hits']
-            while len(myres['hits']['hits']) and len(all_hits) < max_results:
-                myres = self.instances[instance]['session'].scroll(scroll_id = myscrollid, scroll=scroll_time)
-                if myscrollid != myres['_scroll_id']:
-                    myscrollid = myres['_scroll_id']
-                    if self.debug:
-                        print("Got new Scroll ID")
-                all_hits += myres['hits']['hits']
+            if bGood:
+                myscrollid = myres['_scroll_id']
+                all_hits = myres['hits']['hits']
+                while len(myres['hits']['hits']) and len(all_hits) < max_results:
+                    myres = self.instances[instance]['session'].scroll(scroll_id = myscrollid, scroll=scroll_time)
+                    if myscrollid != myres['_scroll_id']:
+                        myscrollid = myres['_scroll_id']
+                        if self.debug:
+                            print("Got new Scroll ID")
+                    all_hits += myres['hits']['hits']
 
         elif qlang == "eql":
             try:
