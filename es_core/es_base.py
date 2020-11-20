@@ -26,7 +26,7 @@ class Es(Integration):
     # The name of the integration
     name_str = "es"
     instances = {} 
-    custom_evars = ['es_conn_default', 'es_max_results']
+    custom_evars = ['es_conn_default', 'es_max_results', 'es_batch_size', 'es_scroll_time']
     # These are the variables in the opts dict that allowed to be set by the user. These are specific to this custom integration and are joined
     # with the base_allowed_set_opts from the integration base
 
@@ -36,13 +36,14 @@ class Es(Integration):
 
 
     # Suportted Search Languages
-    search_langs = ['eql', 'dsl', 'basic', 'sql']
+    search_langs = ['eql', 'dsl', 'basic', 'sql', 'sqltrans']
 
 
     myopts = {}
     myopts['es_conn_default'] = ["default", "Default instance to connect with"]
-    myopts['es_max_results'] = [10000, "Number of max results to return 10000 is the max"]
-
+    myopts['es_max_results'] = [10000, "Number of max results to return. Under 10000 this number is exact, above 10000 this number will an estimate with the real results being greater than es_max_results by up to es_batch_size"]
+    myopts['es_batch_size'] = [1000, "Number of results to take in matches when using scroll api"]
+    myopts['es_scroll_time'] = ["2s", "Scroll Windows size"]
 
     # Class Init function - Obtain a reference to the get_ipython()
     def __init__(self, shell, pd_display_grid="html", es_conn_url_default="", debug=False, *args, **kwargs):
@@ -217,7 +218,7 @@ class Es(Integration):
         if qlang is None:
             print("No language specified - Defauling to basic queries")
 
-        if qindex is None:
+        if qindex is None and qlang not in ["sql", "sqltrans"]:
             print("No index provided - Stopping execution to ensure you wish to search all indexes (run query again to override)")
             if bReRun == False:
                 bRun = False
@@ -299,22 +300,30 @@ class Es(Integration):
         mydf = None
         status = ""
         str_err = ""
-        max_results = self.opts['es_max_results'][0]
-        if qlang == "basic":
+        all_hits = []
+        max_results = int(self.opts['es_max_results'][0])
+        batch_size = int(self.opts['es_batch_size'][0])
+        scroll_time = self.opts['es_scroll_time'][0]
+        if qlang in ['basic', 'dsl']:
             try:
-                results = self.instances[instance]['session'].search(q=myquery, index=qindex, size=max_results)
-                status = "Query Success"
+                if qlang == 'basic':
+                    myres = self.instances[instance]['session'].search(q=myquery, index=qindex,  size=batch_size, scroll=scroll_time)
+                elif qlang == 'dsl':
+                    myres = self.instances[instance]['session'].search(body=myquery, index=qindex,  size=batch_size, scroll=scroll_time)
             except Exception as e:
                 mydf = None
-                str_err = str(e)
-        elif qlang == "dsl":
-            try:
-                mybody = eval(myquery)
-                results = self.instances[instance]['session'].search(body=mybody, index=qindex, size=max_results)
-                status = "Query Success"
-            except Exception as e:
-                mydf = None
-                str_err = str(e)
+                str_err +="\nES Query error: %s" % str(e)
+
+            myscrollid = myres['_scroll_id']
+            all_hits = myres['hits']['hits']
+            while len(myres['hits']['hits']) and len(all_hits) < max_results:
+                myres = self.instances[instance]['session'].scroll(scroll_id = myscrollid, scroll=scroll_time)
+                if myscrollid != myres['_scroll_id']:
+                    myscrollid = myres['_scroll_id']
+                    if self.debug:
+                        print("Got new Scroll ID")
+                all_hits += myres['hits']['hits']
+
         elif qlang == "eql":
             try:
                 mybody = eval(myquery)
@@ -322,7 +331,63 @@ class Es(Integration):
                 status = "Query Success"
             except Exception as e:
                 mydf = None
-                str_err = str(e)
+                str_err += "EQL error: %s" % str(e)
+        elif qlang == "sqltrans":
+            try:
+                body = {"query": myquery, "fetch_size": batch_size}
+                myres = self.instances[instance]['session'].sql.translate(body=body, format="json")
+                str_err = "Other: \n" + json.dumps(myres, sort_keys=True, indent=4, separators=(',', ': '))
+            except Exception as e:
+                str_err += "\n SQL Translate error Occured: %s" % str(e)
+
+        elif qlang == "sql":
+            bGood = True
+            mycurs = None
+            clear_curs = None
+            cols = []
+            rows = []
+            try:
+                body = {"query": myquery, "fetch_size": batch_size}
+                myres = self.instances[instance]['session'].sql.query(body=body, format="json")
+            except Exception as e:
+                str_err += "\n SQL Query error: %s" % str(e)
+                bGood = False
+            if bGood:
+                try:
+                    cols = myres['columns']
+                    rows = myres['rows']
+                    if 'cursor' in myres.keys():
+                        mycurs = myres['cursor']
+                except Exception as e:
+                    str_err += "\n SQL fetch rows/cols error: %s" % str(e)
+                    bGood = False
+            if bGood:
+                while mycurs is not None:
+                    try:
+                        body = {"cursor": mycurs, "fetch_size": batch_size}
+                        myres = self.instances[instance]['session'].sql.query(body=body, format="json")
+                        if "cursor" in myres.keys():
+                            mycurs = myres['cursor']
+                        else:
+                            clear_curs = mycurs
+                            mycurs = None
+                        rows += myres['rows']
+                        if len(rows) >= max_results:
+                            clear_curs = mycurs
+                            mycurs = None
+                        if mycurs is None:
+                            # Clear Cursosr
+                            finalres = self.instances[instance]['session'].sql.clear_cursor(body={"cursor": clear_curs})
+                    except Exception as e:
+                        str_err += "Pagination sql error: %s" % str(e)
+                        bGood = False
+            if bGood:
+                col_names = [c["name"] for c in cols]
+                all_hits = []
+                all_hits = [dict(zip(col_names, r)) for r in rows]
+
+
+
 # New Pandas version
         if qlang == "eql":
             try:
@@ -336,7 +401,7 @@ class Es(Integration):
                     print(str_err)
         elif qlang in ['basic', 'dsl', 'sql']:
             try:
-                res_list = results['hits']['hits']
+                res_list = all_hits
             except Exception as e:
                 mydf = None
                 str_err = "Error - hits->hits\n"
@@ -344,29 +409,26 @@ class Es(Integration):
                 if self.debug:
                     print("Failed to find hits -> hits array in results")
                     print(str_err)
+
+
+
         if str_err == "":
             # Update the last results
-            self.ipy.user_ns['prev_' + self.name_str + "_" + instance + "_js"] = results
+#            self.ipy.user_ns['prev_' + self.name_str + "_" + instance + "_js"] = res_list
             # Make Data frame
 
             try:
-                flat_res_list = [self.hit_to_row(hit) for hit in res_list]
+                if qlang == "sql":
+                    flat_res_list = all_hits
+                else:
+                    flat_res_list = [self.hit_to_row(hit) for hit in res_list]
                 mydf = pd.DataFrame(flat_res_list)
             except Exception as e:
                 mydf = None
                 str_err += "\nPandas conversion error\n" + str(e)
 
-            
-# Old way with pandastic module and 
-#        try:
-#            mydf = Select.from_dict(results).to_pandas()
-#        except Exception as e:
-#            mydf = None
-#            if str_err != "":
-#                str_err += "\n"
-#            str_err += "Pandas conversion error\n" + str(e)
 
-        if str_err.find("error") < 0 and str_err.find("Warning") < 0:
+        if str_err.find("error") < 0 and str_err.find("Warning") < 0 and str_err.find("Other: ") < 0:
             if mydf is not  None:
                 str_err = "Success"
                 if len(mydf) == max_results:
@@ -374,10 +436,13 @@ class Es(Integration):
             else:
                mydf = None
                str_err = "Success - No Results"
-
+        
 
         if str_err.find("Success") >= 0:
             pass
+        elif str_err.find("Other: ") >= 0:
+            status = str_err
+            mydf = None
         else:
             status = "Failure - query_error: \n" + str_err
 
