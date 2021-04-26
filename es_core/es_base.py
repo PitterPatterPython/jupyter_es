@@ -15,7 +15,7 @@ from IPython.core.display import HTML
 
 # from pandasticsearch import Select # Doing it without pandasticsearch
 from elasticsearch import Elasticsearch
-
+import jupyter_integrations_utility as jiu
 #import IPython.display
 from IPython.display import display_html, display, Javascript, FileLink, FileLinks, Image
 import ipywidgets as widgets
