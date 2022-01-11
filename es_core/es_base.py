@@ -71,10 +71,9 @@ class Es(Integration):
         if inst is not None:
             inst['session'] = None
             mypass = ""
-            if inst['connect_pass'] is not None:
-                mypass = inst['connect_pass']
-            else:
-                mypass = self.instances[self.opts[self.name_str + "_conn_default"][0]]['connect_pass']
+            if inst['enc_pass'] is not None:
+                mypass = self.ret_dec_pass(inst['enc_pass'])
+                inst['connect_pass'] = ""
 
             es_def_opts = {
                             "use_ssl": False, "verify_certs": False, "ca_certs": None, "client_cert": None, "client_key": None,
