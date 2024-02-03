@@ -14,23 +14,19 @@ class Es(Integration):
     # The name of the integration
     name_str = "es"
     instances = {}
-    custom_evars = ['es_conn_default', 'es_max_results', 'es_batch_size', 'es_scroll_time']
+    custom_evars = ["es_conn_default", "es_max_results", "es_batch_size", "es_scroll_time"]
 
     # These are the variables in the opts dict that allowed to be set by the user. These are specific
     # to this custom integration and are joined with the base_allowed_set_opts from the integration base
-
     custom_allowed_set_opts = ["es_conn_default", "es_max_results"]
 
-    # Suportted Search Languages
-    search_langs = ['eql', 'dsl', 'basic', 'sql', 'sqltrans']
-
     myopts = {}
-    myopts['es_conn_default'] = ["default", "Default instance to connect with"]
-    myopts['es_max_results'] = [10000, "Number of max results to return. Under 10000 this number \
+    myopts["es_conn_default"] = ["default", "Default instance to connect with"]
+    myopts["es_max_results"] = [10000, "Number of max results to return. Under 10000 this number \
         is exact, above 10000 this number will an estimate with the real results being greater \
         than es_max_results by up to es_batch_size"]
-    myopts['es_batch_size'] = [1000, "Number of results to take in matches when using scroll api"]
-    myopts['es_scroll_time'] = ["2s", "Scroll Windows size"]
+    myopts["es_batch_size"] = [1000, "Number of results to take in matches when using scroll api"]
+    myopts["es_scroll_time"] = ["2s", "Scroll Windows size"]
 
     def __init__(self, shell, debug=False, *args, **kwargs):
         super(Es, self).__init__(shell, debug=debug)
@@ -54,11 +50,11 @@ class Es(Integration):
         else:
             inst = self.instances[instance]
         if inst is not None:
-            inst['session'] = None
+            inst["session"] = None
             mypass = ""
-            if inst['enc_pass'] is not None:
-                mypass = self.ret_dec_pass(inst['enc_pass'])
-                inst['connect_pass'] = ""
+            if inst["enc_pass"] is not None:
+                mypass = self.ret_dec_pass(inst["enc_pass"])
+                inst["connect_pass"] = ""
 
             try:
                 inst["session"] = ElasticAPI(
