@@ -1,5 +1,4 @@
 from argparse import ArgumentParser
-import json
 from es_utils.es_api import ElasticAPI
 
 
@@ -33,23 +32,6 @@ class UserInputParser(ArgumentParser):
 
     def display_help(self, command):
         self.parser.parse_args([command], "--help")
-
-    # def transform_query(self, query):
-    #     """Transform the user's query to a JSON object. The user's query
-    #        is passed as a string (i.e. - '"category" : "*Men\'s"'). This
-    #        will wrap it in curly braces, and then json.loads() it to
-    #        transform it into an appropriate JSON object that Elasticsearch
-    #        understands.
-
-    #     Args:
-    #         query (str): The user's query, as inputted into the Jupyter cell
-
-    #     Returns:
-    #         dict: a JSON object containing the user's query
-    #     """
-    #     query = f"{{{query}}}"
-
-    #     return json.loads(query)
 
     def parse_input(self, input, type):
         """Parses the user's line magic from Jupyter
@@ -103,9 +85,6 @@ class UserInputParser(ArgumentParser):
                 elif len(split_user_input) == 2:
                     parsed_user_command = self.cell_parser.parse_args(split_user_input[0].split())
                     parsed_user_query = split_user_input[1]
-
-                    # # Transform the user's query into a JSON object
-                    # transformed_query = self.transform_query(parsed_user_query)
 
                     parsed_input["input"].update(vars(parsed_user_command))
                     parsed_input["input"].update({"query": parsed_user_query})
