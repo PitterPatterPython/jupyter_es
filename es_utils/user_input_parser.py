@@ -33,11 +33,15 @@ class UserInputParser(ArgumentParser):
     def display_help(self, command):
         self.parser.parse_args([command], "--help")
 
-    def parse_input(self, input, type):
+    def parse_input(self, input, type, **kwargs):
         """Parses the user's line magic from Jupyter
 
         Args:
             input (str): the entire contents of the line from Jupyter
+            type (str): specifies whether or not the input is coming from
+                a line or cell magic
+            kwargs (dict): the "search_opts" dictionary from es_full, which
+                will get combined with the parsed_input when it's returned
 
         Returns:
             parsed_input (dict): an object containing an error status, a message,
@@ -86,7 +90,10 @@ class UserInputParser(ArgumentParser):
                     parsed_user_command = self.cell_parser.parse_args(split_user_input[0].split())
                     parsed_user_query = split_user_input[1]
 
+                    # add the parsed user arguments
                     parsed_input["input"].update(vars(parsed_user_command))
+                    # add the **kwargs ("search_opts" from es_full)
+                    parsed_input["input"].update(kwargs)
                     parsed_input["input"].update({"query": parsed_user_query})
 
                 else:

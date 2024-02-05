@@ -14,19 +14,20 @@ class Es(Integration):
     # The name of the integration
     name_str = "es"
     instances = {}
-    custom_evars = ["es_conn_default", "es_max_results", "es_batch_size", "es_scroll_time"]
+    custom_evars = ["es_conn_default", "es_max_results", "es_scroll_size", "es_scroll_time"]
 
     # These are the variables in the opts dict that allowed to be set by the user. These are specific
     # to this custom integration and are joined with the base_allowed_set_opts from the integration base
-    custom_allowed_set_opts = ["es_conn_default", "es_max_results"]
+    custom_allowed_set_opts = ["es_conn_default", "es_max_results", "es_scroll_size", "es_scroll_time"]
 
     myopts = {}
     myopts["es_conn_default"] = ["default", "Default instance to connect with"]
-    myopts["es_max_results"] = [10000, "Number of max results to return. Under 10000 this number \
-        is exact, above 10000 this number will an estimate with the real results being greater \
-        than es_max_results by up to es_batch_size"]
-    myopts["es_batch_size"] = [1000, "Number of results to take in matches when using scroll api"]
-    myopts["es_scroll_time"] = ["2s", "Scroll Windows size"]
+    myopts["es_max_results"] = [10000, "Maximum number of hits to return in your results set."]
+    myopts["es_scroll_size"] = [1000, "This number represents the number of hits to process \
+        at once in your results set."]
+    myopts["es_scroll_time"] = ["2m", "Specifies to the server how long to keep scrollable \
+        results available while the client accepts and processes results. Only change this \
+        if you're receiving errors."]
 
     def __init__(self, shell, debug=False, *args, **kwargs):
         super(Es, self).__init__(shell, debug=debug)
@@ -35,6 +36,12 @@ class Es(Integration):
         # Add local variables to opts dict
         for k in self.myopts.keys():
             self.opts[k] = self.myopts[k]
+
+        # Transform self.opts to a regular dictionary to be used alongside
+        # calls to the Elasticsearch API
+        self.search_opts = {}
+        for k, v in self.myopts.items():
+            self.search_opts[k] = v[0]
 
         self.user_input_parser = UserInputParser()
         self.response_parser = ResponseParser()
@@ -78,7 +85,7 @@ class Es(Integration):
         status = ""
 
         try:
-            parsed_input = self.user_input_parser.parse_input(query, type="cell")
+            parsed_input = self.user_input_parser.parse_input(query, type="cell", **self.search_opts)
 
             if self.debug:
                 jiu.displayMD(f"**[ Dbg ]** parsed_input\n{parsed_input}")
@@ -122,7 +129,10 @@ class Es(Integration):
 
         cell_magic_table = ("| Cell Magic | Description |\n"
                             "| ---------- | ----------- |\n"
-                            "| %%es instance<br>--help | Display usage syntax help for `%%es` cell magics |\n")
+                            "| %%es instance<br>--help | Display usage syntax help for `%%es` cell magics |\n"
+                            "| %%es instance<br>command --help | Display the help syntax for a command below |\n"
+                            "| %%es instance<br>search -i instance -d index<br>field1: hello AND datetime: now-7d/d \
+                                | Perform a query using Elasticsearch's **Query String Query** syntax |\n")
 
         line_magic_helper_text = (f"\n## Running {magic_name} line magics\n"
                                   "-------------------------------\n"
@@ -133,6 +143,7 @@ class Es(Integration):
         line_magic_table = ("| Line Magic | Description |\n"
                             "| ---------- | ----------- |\n"
                             "| %es --help | Display usage syntax help for `%es` line magics |\n"
+                            "| %es command --help | Display usage syntax help for a command below |\n"
                             "| %es instance<br>get_indices | Retrieve a list of indices from the \
                                 Elasticsearch cluster |\n")
 
