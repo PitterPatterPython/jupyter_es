@@ -49,7 +49,7 @@ class Es(Magics):
         else:
             if self.shell.user_ns["jupyter_loaded_integrations"][self.name_str] != f"{self.name_str}_base":
                 jiu.display_warning(f"We should only get here with a {self.name_str}_base state. Currently \
-                    for {self.name_str}: {self.shell.user_ns["jupyter_loaded_integrations"][self.name_str]}")
+                    for {self.name_str}: {self.shell.user_ns['jupyter_loaded_integrations'][self.name_str]}")
             else:
                 if self.debug:
                     jiu.displayMD(f"Loading full {self.name_str} from base")
