@@ -64,7 +64,6 @@ class Es(Integration):
                 inst["connect_pass"] = ""
 
             try:
-                print(inst)
                 inst["session"] = ElasticAPI(
                     inst["host"],
                     inst["port"],
