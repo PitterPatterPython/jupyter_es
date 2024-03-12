@@ -64,9 +64,11 @@ class Es(Integration):
                 inst["connect_pass"] = ""
 
             try:
+                print(inst)
                 inst["session"] = ElasticAPI(
                     inst["host"],
                     inst["port"],
+                    inst["scheme"],
                     inst["user"],
                     mypass,
                     **inst["options"]
@@ -131,8 +133,9 @@ class Es(Integration):
                             "| ---------- | ----------- |\n"
                             "| %%es instance<br>--help | Display usage syntax help for `%%es` cell magics |\n"
                             "| %%es instance<br>command --help | Display the help syntax for a command below |\n"
-                            "| %%es instance<br>search -i instance -d index<br>field1: hello AND datetime: now-7d/d \
-                                | Perform a query using Elasticsearch's **Query String Query** syntax |\n")
+                            "| %%es instance<br>search -i instance -d index<br>field1: (hello OR goodbye) \
+                                AND datetime: now-7d/d | Perform a query using Elasticsearch's **Query String \
+                                Query** syntax. https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html |\n")
 
         line_magic_helper_text = (f"\n## Running {magic_name} line magics\n"
                                   "-------------------------------\n"

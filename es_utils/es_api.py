@@ -4,25 +4,29 @@ from elasticsearch import Elasticsearch
 class ElasticAPI:
 
     # https://elasticsearch-py.readthedocs.io/en/v8.12.0/api/elasticsearch.html
-    def __init__(self, host, port, username, password, **kwargs):
+    def __init__(self, host, port, scheme, username, password, **kwargs):
 
         es_options = {
-            "use_ssl": False,
             "verify_certs": False,
-            "ca_certs": None,
-            "client_cert": None,
-            "client_key": None,
-            "http_compress": None,
-            "ssl_show_warn": False,
-            "sniff_on_start": False,
-            "sniff_on_connection_fail": False,
-            "sniffer_timeout": None
+            "ssl_show_warn": False
             }
 
+        # Remove namedpw and namedsecret keys from kwargs
+        # because it will break the ES connection initialization
+        try:
+            del kwargs["namedpw"]
+            del kwargs["namedsecret"]
+        except KeyError:
+            pass
+
+        # IMPORTANT NOTE: the kwargs we pass in come from es_full when we instantiate
+        # this class. The line below (es_options.update(kwargs)) allows us to set options
+        # in our environment variables, and have them automatically added to es_options.
+        # Consider it a way to add to, or override, default values. It's cool, I know. I wrote it.
         es_options.update(kwargs)
 
         self.session = Elasticsearch(
-            hosts=f"{host}:{port}",
+            [{"host": host, "port": port, "scheme": scheme}],
             basic_auth=(username, password),
             **es_options
         )
@@ -40,7 +44,7 @@ class ElasticAPI:
             list: a list of index names from the cluster
         """
 
-        indices = [idx for idx in self.session.indices.get_alias(index="*")]
+        indices = [idx["index"] for idx in self.session.cat.indices(format="json") if not idx["index"].startswith(".")]
 
         return indices
 
