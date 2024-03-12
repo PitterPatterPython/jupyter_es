@@ -23,7 +23,7 @@ class ResponseParser:
         instance = kwargs.get("instance")
         response.sort()
         formatted_index_names = "".join(f"* {idx}\n" for idx in response if not idx.startswith("."))
-        formatted_index_list = (f"#### Indexes in `{instance}`\n"
+        formatted_index_list = (f"#### Indices in `{instance}`\n"
                                 "***\n"
                                 f"{formatted_index_names}")
 
