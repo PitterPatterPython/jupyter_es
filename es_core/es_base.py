@@ -3,7 +3,6 @@ from es_core._version import __desc__
 import jupyter_integrations_utility as jiu
 
 
-
 @magics_class
 class Es(Magics):
     # Static Variables
