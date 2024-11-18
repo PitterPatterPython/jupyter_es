@@ -71,19 +71,28 @@ class ElasticAPI:
         search_results = []
 
         query = {
-                "query": {
-                    "query_string": {
-                        "query": user_query
-                    }
-                },
-                "size": scroll_size,
-                "from": 0
-            }
+            "query": {
+                "bool": {
+                    "minimum_should_match": 1,
+                    "should": [
+                        {
+                            "query_string": {
+                                "query": user_query,
+                                "default_operator": "AND"
+                            }
+                        }
+                    ]
+                }
+            },
+            "size": scroll_size,
+            "from": 0
+        }
 
         response = self.session.search(
             index=index,
             scroll=scroll_time,
-            body=query
+            body=query,
+            timeout='30s'
         )
 
         scroll_id = response["_scroll_id"]
